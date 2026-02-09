@@ -1,0 +1,14 @@
+> Type coverage (w\\out tests)
+> 38.85% (17/39)
+
+> FileHandler.ts (line %)
+> 84.62% | 0 of 6
+> 52
+> Type coverage too low (required 90%)
+
+> Read App.test.tsx, verify patterns for native module mocks
+> App.test.tsx has 95% type coverage
+> Missing FileHandler.ts types: handleSharedFile return type, uri param type
+
+> Check TypeScript checks: warnings in navigation types
+> Type check passes

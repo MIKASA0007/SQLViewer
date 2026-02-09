@@ -17,21 +17,42 @@
   the iteration process.
 -->
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: [e.g., Kotlin 1.9, Java 17, or NEEDS CLARIFICATION]  
+**Primary Dependencies**: [e.g., SQLite library, syntax highlighting library, or NEEDS CLARIFICATION]  
+**Minimum SDK**: [e.g., API 26 (Android 8.0) or NEEDS CLARIFICATION]  
+**Target SDK**: [e.g., API 34 (Android 14) or NEEDS CLARIFICATION]  
+**Architecture Pattern**: [e.g., MVVM, MVI, or NEEDS CLARIFICATION]  
+**UI Framework**: [Jetpack Compose or XML layouts]  
+**Testing**: [e.g., JUnit, Espresso, or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+### I. Native Android Experience Compliance
+- [ ] Modern Android development stack selected (Kotlin/Java, appropriate SDK)
+- [ ] Android Studio compatibility verified
+- [ ] Target platform constraints documented
+
+### II. File Association & System Integration
+- [ ] Intent-filter configuration for `.sql` files defined in AndroidManifest.xml
+- [ ] Scoped storage permissions and FileProvider configured
+- [ ] Test plan for file opening from various sources (file manager, email, etc.)
+
+### III. Syntax Highlighting Implementation Plan
+- [ ] SQL parsing/highlighting library selected or custom implementation planned
+- [ ] Performance considerations for large files documented
+- [ ] Supported SQL dialects identified
+
+### IV. Template-Driven Design Compliance
+- [ ] All deliverables use templates from `.specify/templates/`
+- [ ] Custom Android-specific sections documented and justified
+- [ ] Template version compatibility verified
+
+### V. Offline-First & Privacy
+- [ ] Network permission requirements assessed (should be none)
+- [ ] Read-only file access confirmed
+- [ ] No data collection/analytics without explicit justification
 
 ## Project Structure
 
@@ -49,50 +70,36 @@ specs/[###-feature]/
 
 ### Source Code (repository root)
 <!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
+  ACTION REQUIRED: For Android projects, typically one of these structures:
+  Option 1: Single module Kotlin app
+  Option 2: Multi-module (app + core) for better separation
 -->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
+# Recommended: Standard Android Studio project
+app/
 ├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
+│   ├── main/
+│   │   ├── java/com/example/sqlviewer/
+│   │   │   ├── MainActivity.kt
+│   │   │   ├── SqlFileViewerActivity.kt
+│   │   │   ├── SqlHighlighter.kt
+│   │   │   └── FileIntentHandler.kt
+│   │   ├── res/
+│   │   │   ├── layout/
+│   │   │   ├── values/
+│   │   │   └── xml/file_paths.xml  # For FileProvider
+│   │   └── AndroidManifest.xml
+│   └── test/  # Unit tests
+│       └── java/com/example/sqlviewer/
+│           └── SqlHighlighterTest.kt
+└── build.gradle.kts
 
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+# Optional: Additional test directories
+androidTest/  # Instrumentation tests
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: [Document the selected structure and reference the real directories captured above]
 
 ## Complexity Tracking
 
@@ -100,5 +107,5 @@ directories captured above]
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+| [e.g., Custom SQL parser] | [specific performance/accuracy requirements] | [why library insufficient] |
+| [e.g., Multi-module architecture] | [separation of concerns for testing] | [why single module insufficient] |

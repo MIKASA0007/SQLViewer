@@ -3,7 +3,7 @@
 description: "Task list template for feature implementation"
 ---
 
-# Tasks: [FEATURE NAME]
+# Tasks: [Android SQL Viewer - FEATURE NAME]
 
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
