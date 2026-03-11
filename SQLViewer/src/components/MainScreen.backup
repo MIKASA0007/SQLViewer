@@ -1,0 +1,228 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { FileHandler, FileInfo } from '../utils/FileHandler';
+import { SQLParser } from '../utils/SQLParser';
+import { FileData, DisplayMode } from '../types';
+import CodeDisplay from '../components/CodeDisplay';
+import TableDisplay from '../components/TableDisplay';
+
+interface MainScreenProps {
+  sharedUri?: string | null;
+}
+
+function MainScreen({ sharedUri }: MainScreenProps): React.JSX.Element {
+  const [fileData, setFileData] = useState<FileData | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('code');
+
+  useEffect(() => {
+    if (sharedUri) {
+      loadFile(sharedUri);
+    }
+  }, [sharedUri]);
+
+  const loadFile = useCallback(async (uri: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const content = await FileHandler.readFileFromUri(uri);
+      const fileName = uri.split('/').pop() || 'unknown.sql';
+      
+      const statements = SQLParser.parse(content);
+      const hasCreateTable = SQLParser.hasCreateTable(statements);
+
+      const newData: FileData = {
+        uri,
+        name: fileName,
+        content,
+        statements,
+      };
+
+      setFileData(newData);
+      
+      if (hasCreateTable) {
+        setDisplayMode('table');
+      } else {
+        setDisplayMode('code');
+      }
+    } catch (err) {
+      setError('Failed to load file. Please try again.');
+      console.error('Error loading file:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleShare = useCallback(async () => {
+    if (!fileData) return;
+    
+    try {
+      const { Share } = require('react-native');
+      await Share.share({
+        title: 'Share SQL content',
+        message: fileData.content,
+      });
+    } catch (err) {
+      Alert.alert('Error', 'Failed to share content');
+      console.error('Error sharing content:', err);
+    }
+  }, [fileData]);
+
+  const toggleDisplayMode = useCallback(() => {
+    setDisplayMode(prev => prev === 'code' ? 'table' : 'code');
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading file...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!fileData) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.welcomeText}>SQLViewer</Text>
+        <Text style={styles.instructionText}>
+          Open SQL files or share them with this app
+        </Text>
+        <Text style={styles.featureText}>
+          ✨ View CREATE TABLE statements as tables
+        </Text>
+        <Text style={styles.featureText}>
+          💻 View SQL code with syntax highlighting
+        </Text>
+      </View>
+    );
+  }
+
+  const hasCreateTable = SQLParser.hasCreateTable(fileData.statements);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        {hasCreateTable && (
+          <TouchableOpacity
+            style={styles.modeButton}
+            onPress={toggleDisplayMode}>
+            <Text style={styles.modeButtonText}>
+              {displayMode === 'code' ? 'Show Table' : 'Show Code'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {displayMode === 'code' ? (
+        <CodeDisplay
+          content={fileData.content}
+          isDarkMode={false}
+          onShare={handleShare}
+        />
+      ) : (
+        <View style={styles.tableContainer}>
+          {fileData.statements
+            .filter(s => s.type === 'CREATE_TABLE' && s.table)
+            .map((stmt, index) => (
+              <View key={index} style={styles.tableWrapper}>
+                <TableDisplay table={stmt.table!} isDarkMode={false} />
+              </View>
+            ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666666',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    textAlign: 'center',
+  },
+  welcomeText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 12,
+  },
+  instructionText: {
+    fontSize: 16,
+    color: '#666666',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  featureText: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 8,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#F5F5F5',
+  },
+  fileName: {
+    display: 'none',
+  },
+  modeButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginLeft: 12,
+  },
+  modeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tableContainer: {
+    flex: 1,
+  },
+  tableWrapper: {
+    flex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+});
+
+export default MainScreen;

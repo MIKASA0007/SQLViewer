@@ -1,4 +1,7 @@
 import RNFS from 'react-native-fs';
+import { NativeModules, Platform } from 'react-native';
+
+const { IntentModule } = NativeModules;
 
 export interface FileInfo {
   uri: string;
@@ -15,20 +18,14 @@ export class FileHandler {
       }
 
       const uri = shared.url;
-      const fileStats = await RNFS.stat(uri);
-      
-      if (!fileStats.isFile()) {
-        return null;
-      }
-
-      const content = await RNFS.readFile(uri, 'utf8');
+      const content = await this.readFileFromUri(uri);
       const fileName = uri.split('/').pop() || 'unknown.sql';
 
       return {
         uri,
         name: fileName,
         content,
-        size: fileStats.size,
+        size: content.length,
       };
     } catch (error) {
       console.error('Error handling shared file:', error);
@@ -37,10 +34,26 @@ export class FileHandler {
   }
 
   static async readFileFromUri(uri: string): Promise<string> {
+    // 如果是 Android 的 content:// URI，直接用原生方法读取
+    if (Platform.OS === 'android' && uri.startsWith('content://')) {
+      console.log('DEBUG: Reading content:// URI with native method');
+      try {
+        if (IntentModule && IntentModule.readContentUri) {
+          const content = await IntentModule.readContentUri(uri);
+          console.log('DEBUG: Successfully read content URI, length:', content?.length);
+          return content;
+        }
+      } catch (error) {
+        console.error('Error reading content URI with native method:', error);
+        throw error;
+      }
+    }
+    
+    // 其他情况用 RNFS 读取
     try {
       return await RNFS.readFile(uri, 'utf8');
     } catch (error) {
-      console.error('Error reading file:', error);
+      console.error('Error reading file with RNFS:', error);
       throw error;
     }
   }
