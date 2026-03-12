@@ -300,7 +300,7 @@ function MainScreen(): React.JSX.Element {
           </ScrollView>
         </View>
       )}
-      <AIAssistant sqlContent={fileData?.content || ''} serverUrl="http://10.0.2.2:3001" />
+      <AIAssistant sqlContent={fileData?.content || ''} serverUrl="http://192.168.1.134:3001" />
     </View>
   );
 }

@@ -144,7 +144,7 @@ function ViewerScreen({route, navigation}: ViewerScreenProps): React.JSX.Element
           {content}
         </SyntaxHighlighter>
       </ScrollView>
-      <AIAssistant sqlContent={content} serverUrl="http://10.0.2.2:3001" />
+      <AIAssistant sqlContent={content} serverUrl="http://192.168.1.134:3001" />
     </View>
   );
 }
