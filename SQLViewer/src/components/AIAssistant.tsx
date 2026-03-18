@@ -24,6 +24,16 @@ interface Message {
   tokens?: { inputTokens: number; outputTokens: number; totalTokens: number };
 }
 
+interface Model {
+  id: string;
+  name: string;
+  provider: string;
+  accessInfo?: {
+    isRestricted: boolean;
+    reason?: string;
+  };
+}
+
 interface PresetQuestion {
   id: string;
   label: string;
@@ -37,10 +47,14 @@ interface AIAssistantProps {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const EXPANDED_WIDTH = Math.min(SCREEN_WIDTH * 0.9, 400);
-const EXPANDED_HEIGHT = Math.min(SCREEN_HEIGHT * 0.6, 500);
+const EXPANDED_HEIGHT = Math.min(SCREEN_HEIGHT * 0.8, 600);
 const STORAGE_KEY = 'ai_preset_questions';
 const SERVER_URL_KEY = 'ai_server_url';
-const DEFAULT_SERVER_URL = 'http://localhost:3001';
+const DEFAULT_SERVER_URL = 'http://192.168.1.134:3001';
+const MODELS_CACHE_KEY = 'ai_models_cache';
+const MODELS_CACHE_TIME_KEY = 'ai_models_cache_time';
+const SELECTED_MODEL_KEY = 'ai_selected_model';
+const DEFAULT_MODEL = 'Pro/MiniMaxAI/MiniMax-M2.5';
 
 const DEFAULT_PRESETS: PresetQuestion[] = [
   {
@@ -79,9 +93,16 @@ function AIAssistant({
   const [newPresetLabel, setNewPresetLabel] = useState('');
   const [newPresetPrompt, setNewPresetPrompt] = useState('');
   const [serverUrlInput, setServerUrlInput] = useState('');
+  const [models, setModels] = useState<Model[]>([]);
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+  const [modelSearch, setModelSearch] = useState('');
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelToast, setModelToast] = useState('');
   const [currentServerUrl, setCurrentServerUrl] = useState(serverUrl);
   const animation = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     Animated.spring(animation, {
@@ -233,6 +254,16 @@ function AIAssistant({
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || isLoading) return;
+
+      // 取消之前的请求
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // 创建新的AbortController
+      abortControllerRef.current = new AbortController();
+      const currentRequestId = ++currentRequestIdRef.current;
+
       const userMessage: Message = {
         id: Date.now().toString(),
         role: 'user',
@@ -243,17 +274,40 @@ function AIAssistant({
       setShowPresets(false);
       setIsLoading(true);
       Keyboard.dismiss();
+
       try {
+        // 获取当前messages的快照用于history
+        const currentMessages = messages;
+
+        const requestBody = {
+          message: text,
+          sqlContent: sqlContent,
+          history: currentMessages.map(m => ({
+            role: m.role,
+            content: m.content,
+          })),
+          model: selectedModel,
+        };
+
         const response = await fetch(currentServerUrl + '/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: text,
-            sqlContent: sqlContent,
-            history: messages.map(m => ({ role: m.role, content: m.content })),
-          }),
+          body: JSON.stringify(requestBody),
+          signal: abortControllerRef.current.signal,
         });
+
+        // 检查请求是否已被取消
+        if (currentRequestId !== currentRequestIdRef.current) {
+          return;
+        }
+
         const data = await response.json();
+
+        // 再次检查请求是否已被取消
+        if (currentRequestId !== currentRequestIdRef.current) {
+          return;
+        }
+
         if (data.response) {
           const assistantMessage: Message = {
             id: (Date.now() + 1).toString(),
@@ -263,22 +317,64 @@ function AIAssistant({
           };
           setMessages(prev => [...prev, assistantMessage]);
         } else {
-          throw new Error(data.error || 'Failed to get response');
+          throw new Error(data.error || `请求失败 (${response.status})`);
         }
-      } catch (error) {
+      } catch (error: any) {
+        // 忽略取消的错误
+        if (error.name === 'AbortError' || error.name === 'CancellationError') {
+          return;
+        }
+
+        let errorMsg = '未知错误';
+        if (error instanceof Error) {
+          errorMsg = error.message;
+        } else if (typeof error === 'object' && error !== null) {
+          const errObj = error as { message?: string };
+          if (errObj.message) {
+            errorMsg = errObj.message;
+          }
+        }
+
+        // 检查请求是否已被取消
+        if (currentRequestId !== currentRequestIdRef.current) {
+          return;
+        }
+
+        // 针对特定错误码给出更友好的提示
+        let friendlyMessage = `错误: ${errorMsg}`;
+        if (
+          errorMsg.includes('30004') ||
+          errorMsg.includes('私有') ||
+          errorMsg.includes('private')
+        ) {
+          friendlyMessage =
+            '⚠️ 该模型需要更高的API权限或付费访问。\n\n建议：\n1. 检查您的API密钥权限\n2. 尝试选择其他可用的模型\n3. 如需使用此模型，请联系API提供商';
+        } else if (
+          errorMsg.includes('401') ||
+          errorMsg.includes('Unauthorized')
+        ) {
+          friendlyMessage = 'API密钥无效或已过期，请检查配置';
+        } else if (
+          errorMsg.includes('Failed to fetch') ||
+          errorMsg.includes('Network')
+        ) {
+          friendlyMessage = `⚠️ 无法连接到AI服务器 (${currentServerUrl})\n\n请检查：\n1. 服务器是否已启动\n2. 服务器地址是否正确\n3. 手机与电脑网络是否连通`;
+        }
+
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content:
-            '错误: ' + (error instanceof Error ? error.message : '未知错误'),
+          content: friendlyMessage,
         };
         setMessages(prev => [...prev, errorMessage]);
       } finally {
-        setIsLoading(false);
-        setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+        if (currentRequestId === currentRequestIdRef.current) {
+          setIsLoading(false);
+          setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+        }
       }
     },
-    [messages, sqlContent, serverUrl, isLoading],
+    [messages, sqlContent, currentServerUrl, selectedModel, isLoading],
   );
 
   const handlePresetPress = useCallback(
@@ -288,8 +384,16 @@ function AIAssistant({
     [sendMessage],
   );
   const handleRefresh = useCallback(() => {
+    // 取消进行中的请求
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    // 重置请求ID
+    currentRequestIdRef.current = 0;
     setMessages([]);
     setShowPresets(true);
+    setIsLoading(false);
   }, []);
   const handleClearChat = () => {
     Alert.alert('清空聊天', '确定要清空所有聊天记录吗？', [
@@ -340,6 +444,12 @@ function AIAssistant({
 
   const renderSettingsContent = () => (
     <View style={styles.settingsContainer}>
+      {modelToast ? (
+        <View style={[styles.modelToast, { backgroundColor: theme.primary }]}>
+          <Text style={styles.modelToastText}>{modelToast}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.settingsHeader}>
         <Text style={[styles.settingsTitle, { color: theme.text }]}>设置</Text>
         <TouchableOpacity onPress={() => setShowSettings(false)}>
@@ -390,6 +500,123 @@ function AIAssistant({
               onPress={handleResetServerUrl}
             >
               <Text style={styles.formButtonText}>重置</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          AI模型选择
+        </Text>
+        <View
+          style={[
+            styles.modelSelectContainer,
+            { backgroundColor: theme.background, borderColor: theme.border },
+          ]}
+        >
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
+                color: theme.text,
+                borderColor: theme.border,
+                marginBottom: 12,
+              },
+            ]}
+            value={modelSearch}
+            onChangeText={setModelSearch}
+            placeholder="搜索模型..."
+            placeholderTextColor={theme.textSecondary}
+          />
+          {loadingModels ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : (
+            <FlatList
+              data={models.filter(m =>
+                m.name.toLowerCase().includes(modelSearch.toLowerCase()),
+              )}
+              keyExtractor={item => item.id}
+              style={styles.modelList}
+              nestedScrollEnabled={true}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.modelItem,
+                    selectedModel === item.id && {
+                      backgroundColor: theme.primary + '30',
+                    },
+                  ]}
+                  onPress={() => {
+                    setSelectedModel(item.id);
+                    AsyncStorage.setItem(SELECTED_MODEL_KEY, item.id);
+                    setModelToast(`已切换到 ${item.name} 模型`);
+                    setTimeout(() => setModelToast(''), 2000);
+                  }}
+                >
+                  <View style={styles.modelItemContent}>
+                    <View style={styles.modelNameRow}>
+                      <Text
+                        style={[
+                          styles.modelItemName,
+                          { color: theme.text },
+                          selectedModel === item.id && { color: theme.primary },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+                      {item.accessInfo?.isRestricted && (
+                        <Text style={styles.restrictedLabel}>受限制</Text>
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.modelItemProvider,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {item.provider}
+                      {item.accessInfo?.isRestricted &&
+                        ` · ${item.accessInfo.reason}`}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text
+                  style={[styles.noModelsText, { color: theme.textSecondary }]}
+                >
+                  {models.length === 0
+                    ? '点击"加载模型"获取模型列表'
+                    : '没有匹配的模型'}
+                </Text>
+              }
+            />
+          )}
+          <View style={styles.modelButtons}>
+            <TouchableOpacity
+              style={[styles.formButton, { backgroundColor: theme.primary }]}
+              onPress={async () => {
+                setLoadingModels(true);
+                try {
+                  const stored = await AsyncStorage.getItem(SERVER_URL_KEY);
+                  const url = stored || DEFAULT_SERVER_URL;
+                  const res = await fetch(url + '/api/models');
+                  const data = await res.json();
+                  if (data.models) {
+                    // 不进行前端过滤，保留所有模型
+                    setModels(data.models);
+                  }
+                } catch (error) {
+                  Alert.alert('错误', '加载模型列表失败，请检查服务器地址');
+                } finally {
+                  setLoadingModels(false);
+                }
+              }}
+            >
+              <Text style={styles.formButtonText}>加载模型</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -626,6 +853,14 @@ function AIAssistant({
               </Text>
             </View>
           )}
+          <Text
+            style={[
+              styles.currentModelText,
+              { color: theme.textSecondary, marginBottom: 8 },
+            ]}
+          >
+            当前模型: {selectedModel.split('/').pop()}
+          </Text>
           <View style={styles.inputContainer}>
             <TextInput
               style={[
@@ -754,9 +989,6 @@ const styles = StyleSheet.create({
   sendButtonText: { color: '#fff', fontSize: 14, fontWeight: '500' },
   refreshButton: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
   refreshButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  closeButton: { fontSize: 22, fontWeight: '600', padding: 4 },
-  headerBtn: { marginRight: 12 },
-  headerBtnText: { fontSize: 18 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -835,9 +1067,67 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
+  modelToast: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    zIndex: 1000,
+    alignItems: 'center',
+  },
+  modelToastText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  inputTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  currentModelText: {
+    fontSize: 11,
+  },
   aboutContainer: { padding: 12, borderRadius: 8, borderWidth: 1 },
   aboutText: { fontSize: 14, fontWeight: '500' },
   aboutDesc: { fontSize: 12, marginTop: 8 },
+  modelSelectContainer: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+    minHeight: 300,
+  },
+  modelList: { height: 200 },
+  modelItem: { padding: 10, borderRadius: 6, marginBottom: 6 },
+  modelItemContent: { flex: 1 },
+  modelNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modelItemName: { fontSize: 13, fontWeight: '500', flex: 1 },
+  restrictedLabel: {
+    fontSize: 10,
+    backgroundColor: '#FF6B6B',
+    color: '#fff',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  modelItemProvider: { fontSize: 11, marginTop: 2 },
+  noModelsText: { fontSize: 12, textAlign: 'center', marginTop: 12 },
+  modelButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
+  },
+  textArea: { minHeight: 60 },
 });
 
 export default AIAssistant;

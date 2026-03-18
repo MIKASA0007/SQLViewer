@@ -1,0 +1,135 @@
+{
+  "totalRequests": 16,
+  "totalInputTokens": 26917,
+  "totalOutputTokens": 33046,
+  "requests": [
+    {
+      "timestamp": "2026-03-13T08:04:30.494Z",
+      "promptTokens": 40,
+      "completionTokens": 14,
+      "totalTokens": 54,
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "message": "hello"
+    },
+    {
+      "timestamp": "2026-03-13T08:04:40.141Z",
+      "promptTokens": 40,
+      "completionTokens": 35,
+      "totalTokens": 75,
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "message": "���"
+    },
+    {
+      "timestamp": "2026-03-13T08:04:40.993Z",
+      "promptTokens": 33,
+      "completionTokens": 36,
+      "totalTokens": 69,
+      "model": "THUDM/glm-4-9b-chat",
+      "message": "���"
+    },
+    {
+      "timestamp": "2026-03-13T08:05:01.936Z",
+      "promptTokens": 35,
+      "completionTokens": 233,
+      "totalTokens": 268,
+      "model": "Pro/moonshotai/Kimi-K2.5",
+      "message": "hello"
+    },
+    {
+      "timestamp": "2026-03-13T08:08:44.487Z",
+      "promptTokens": 989,
+      "completionTokens": 1381,
+      "totalTokens": 2370,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "请查找这个SQL语句中可能存在的bug或逻辑错误"
+    },
+    {
+      "timestamp": "2026-03-13T08:09:24.242Z",
+      "promptTokens": 1865,
+      "completionTokens": 600,
+      "totalTokens": 2465,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "有语法错误吗"
+    },
+    {
+      "timestamp": "2026-03-13T09:05:15.976Z",
+      "promptTokens": 996,
+      "completionTokens": 1473,
+      "totalTokens": 2469,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "请分析这个SQL语句的健壮性，包括可能的数据类型问题、边界条件处理等"
+    },
+    {
+      "timestamp": "2026-03-18T02:24:22.983Z",
+      "promptTokens": 2349,
+      "completionTokens": 6303,
+      "totalTokens": 8652,
+      "model": "Pro/zai-org/GLM-4.7",
+      "message": "请查找这个SQL语句中可能存在的bug或逻辑错误"
+    },
+    {
+      "timestamp": "2026-03-18T02:25:27.717Z",
+      "promptTokens": 2291,
+      "completionTokens": 5721,
+      "totalTokens": 8012,
+      "model": "Pro/moonshotai/Kimi-K2-Thinking",
+      "message": "现在代码有语法错误吗"
+    },
+    {
+      "timestamp": "2026-03-18T02:27:29.244Z",
+      "promptTokens": 4402,
+      "completionTokens": 4363,
+      "totalTokens": 8765,
+      "model": "Pro/zai-org/GLM-4.7",
+      "message": "12"
+    },
+    {
+      "timestamp": "2026-03-18T02:58:56.960Z",
+      "promptTokens": 2313,
+      "completionTokens": 1520,
+      "totalTokens": 3833,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "请查找这个SQL语句中可能存在的bug或逻辑错误"
+    },
+    {
+      "timestamp": "2026-03-18T02:59:15.260Z",
+      "promptTokens": 2313,
+      "completionTokens": 2331,
+      "totalTokens": 4644,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "请查找这个SQL语句中可能存在的bug或逻辑错误"
+    },
+    {
+      "timestamp": "2026-03-18T03:02:10.603Z",
+      "promptTokens": 2320,
+      "completionTokens": 2186,
+      "totalTokens": 4506,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "请分析这个SQL语句的健壮性，包括可能的数据类型问题、边界条件处理等"
+    },
+    {
+      "timestamp": "2026-03-18T03:02:14.856Z",
+      "promptTokens": 2309,
+      "completionTokens": 2610,
+      "totalTokens": 4919,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "请给出这个SQL语句的性能优化建议"
+    },
+    {
+      "timestamp": "2026-03-18T03:50:10.169Z",
+      "promptTokens": 2313,
+      "completionTokens": 1765,
+      "totalTokens": 4078,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "请查找这个SQL语句中可能存在的bug或逻辑错误"
+    },
+    {
+      "timestamp": "2026-03-18T03:50:30.923Z",
+      "promptTokens": 2309,
+      "completionTokens": 2475,
+      "totalTokens": 4784,
+      "model": "Pro/MiniMaxAI/MiniMax-M2.5",
+      "message": "请给出这个SQL语句的性能优化建议"
+    }
+  ]
+}

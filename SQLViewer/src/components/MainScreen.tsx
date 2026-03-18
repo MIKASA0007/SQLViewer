@@ -11,19 +11,27 @@ import {
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { FileHandler, FileInfo } from '../utils/FileHandler';
 import { SQLParser } from '../utils/SQLParser';
-import { FileData, DisplayMode, SQLStatement, SQLTable, Column } from '../types';
+import {
+  FileData,
+  DisplayMode,
+  SQLStatement,
+  SQLTable,
+  Column,
+} from '../types';
 import CodeDisplay from '../components/CodeDisplay';
-import AIAssistant from '../components/AIAssistant';
+import AIAssistant from './AIAssistant';
 
 function MainScreen(): React.JSX.Element {
   const route = useRoute<RouteProp<any, 'MainScreen'>>();
   const sharedUri = route.params?.sharedUri;
-  
+
   const [fileData, setFileData] = useState<FileData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'code' | 'data'>('code');
-  const [dataSubTab, setDataSubTab] = useState<'structure' | 'preview'>('structure');
+  const [dataSubTab, setDataSubTab] = useState<'structure' | 'preview'>(
+    'structure',
+  );
 
   useEffect(() => {
     console.log('MainScreen useEffect, sharedUri:', sharedUri);
@@ -35,11 +43,11 @@ function MainScreen(): React.JSX.Element {
   const loadFile = useCallback(async (uri: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const content = await FileHandler.readFileFromUri(uri);
       const fileName = uri.split('/').pop() || 'unknown.sql';
-      
+
       const statements = SQLParser.parse(content);
 
       const newData: FileData = {
@@ -60,7 +68,7 @@ function MainScreen(): React.JSX.Element {
 
   const handleShare = useCallback(async () => {
     if (!fileData) return;
-    
+
     try {
       const { Share } = require('react-native');
       await Share.share({
@@ -108,7 +116,8 @@ function MainScreen(): React.JSX.Element {
   }
 
   const createTableStatements = fileData.statements.filter(
-    (s): s is SQLStatement & { table: SQLTable } => s.type === 'CREATE_TABLE' && !!s.table
+    (s): s is SQLStatement & { table: SQLTable } =>
+      s.type === 'CREATE_TABLE' && !!s.table,
   );
 
   const insertStatements = fileData.statements.filter(s => s.type === 'INSERT');
@@ -128,28 +137,49 @@ function MainScreen(): React.JSX.Element {
           <View key={stmtIndex} style={styles.tableContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={true}>
               <View style={styles.tableWrapper}>
-                <View style={[styles.tableHeader, { backgroundColor: '#F0F0F0' }]}>
-                  <Text style={[styles.headerCell, styles.nameColumn]}>字段名</Text>
-                  <Text style={[styles.headerCell, styles.typeColumn]}>类型</Text>
-                  <Text style={[styles.headerCell, styles.constraintColumn]}>约束</Text>
+                <View
+                  style={[styles.tableHeader, { backgroundColor: '#F0F0F0' }]}
+                >
+                  <Text style={[styles.headerCell, styles.nameColumn]}>
+                    字段名
+                  </Text>
+                  <Text style={[styles.headerCell, styles.typeColumn]}>
+                    类型
+                  </Text>
+                  <Text style={[styles.headerCell, styles.constraintColumn]}>
+                    约束
+                  </Text>
                 </View>
-                
+
                 {stmt.table.columns.map((column, colIndex) => (
-                  <View 
-                    key={colIndex} 
+                  <View
+                    key={colIndex}
                     style={[
                       styles.tableRow,
-                      { backgroundColor: colIndex % 2 === 0 ? '#FFFFFF' : '#F8F8F8' }
+                      {
+                        backgroundColor:
+                          colIndex % 2 === 0 ? '#FFFFFF' : '#F8F8F8',
+                      },
                     ]}
                   >
-                    <Text style={[styles.tableCell, styles.nameColumn]} numberOfLines={1}>
+                    <Text
+                      style={[styles.tableCell, styles.nameColumn]}
+                      numberOfLines={1}
+                    >
                       {column.name}
                     </Text>
-                    <Text style={[styles.tableCell, styles.typeColumn]} numberOfLines={1}>
+                    <Text
+                      style={[styles.tableCell, styles.typeColumn]}
+                      numberOfLines={1}
+                    >
                       {column.type}
                     </Text>
-                    <Text style={[styles.tableCell, styles.constraintColumn]} numberOfLines={1}>
-                      {column.primaryKey ? 'PK' : ''}{column.nullable ? '' : ' NOT NULL'}
+                    <Text
+                      style={[styles.tableCell, styles.constraintColumn]}
+                      numberOfLines={1}
+                    >
+                      {column.primaryKey ? 'PK' : ''}
+                      {column.nullable ? '' : ' NOT NULL'}
                     </Text>
                   </View>
                 ))}
@@ -170,15 +200,21 @@ function MainScreen(): React.JSX.Element {
       );
     }
 
-    const allInsertData: { tableName: string; columns: Column[]; rows: string[][] }[] = [];
-    
+    const allInsertData: {
+      tableName: string;
+      columns: Column[];
+      rows: string[][];
+    }[] = [];
+
     createTableStatements.forEach(stmt => {
       const tableName = stmt.table.name;
       const columns = stmt.table.columns;
-      
+
       const insertData: string[][] = [];
       insertStatements.forEach(insert => {
-        const match = insert.original.match(/INSERT\s+INTO\s+[`"']?(\w+)[`"']?/i);
+        const match = insert.original.match(
+          /INSERT\s+INTO\s+[`"']?(\w+)[`"']?/i,
+        );
         if (match && match[1].toLowerCase() === tableName.toLowerCase()) {
           const valuesMatch = insert.original.match(/VALUES\s*(.+)/is);
           if (valuesMatch) {
@@ -186,18 +222,20 @@ function MainScreen(): React.JSX.Element {
             const rowRegex = /\(([^)]+)\)/g;
             let rowMatch;
             while ((rowMatch = rowRegex.exec(valuesStr)) !== null) {
-              const rowValues = rowMatch[1].split(',').map((v: string) => v.trim().replace(/^['"`]|['"`]$/g, ''));
+              const rowValues = rowMatch[1]
+                .split(',')
+                .map((v: string) => v.trim().replace(/^['"`]|['"`]$/g, ''));
               insertData.push(rowValues);
             }
           }
         }
       });
-      
+
       allInsertData.push({ tableName, columns, rows: insertData });
     });
 
     const hasData = allInsertData.some(d => d.rows.length > 0);
-    
+
     if (!hasData) {
       return (
         <View style={styles.emptyState}>
@@ -209,7 +247,10 @@ function MainScreen(): React.JSX.Element {
     const allRows: { row: string[]; bgColor: string }[] = [];
     allInsertData.forEach(data => {
       data.rows.forEach((row, idx) => {
-        allRows.push({ row, bgColor: allRows.length % 2 === 0 ? '#FFFFFF' : '#F8F8F8' });
+        allRows.push({
+          row,
+          bgColor: allRows.length % 2 === 0 ? '#FFFFFF' : '#F8F8F8',
+        });
       });
     });
 
@@ -219,20 +260,23 @@ function MainScreen(): React.JSX.Element {
           <View style={styles.tableWrapper}>
             <View style={[styles.tableHeader, { backgroundColor: '#F0F0F0' }]}>
               {allInsertData[0].columns.map((col, colIdx) => (
-                <Text key={colIdx} style={[styles.headerCell, styles.previewColumn]}>
+                <Text
+                  key={colIdx}
+                  style={[styles.headerCell, styles.previewColumn]}
+                >
                   {col.name}
                 </Text>
               ))}
             </View>
-            
+
             {allRows.map((item, rowIdx) => (
-              <View 
+              <View
                 key={rowIdx}
                 style={[styles.tableRow, { backgroundColor: item.bgColor }]}
               >
                 {item.row.map((value: string, valIdx: number) => (
-                  <Text 
-                    key={valIdx} 
+                  <Text
+                    key={valIdx}
                     style={[styles.tableCell, styles.previewColumn]}
                     numberOfLines={1}
                   >
@@ -254,7 +298,12 @@ function MainScreen(): React.JSX.Element {
           style={[styles.tab, activeTab === 'code' && styles.tabActive]}
           onPress={() => setActiveTab('code')}
         >
-          <Text style={[styles.tabText, activeTab === 'code' && styles.tabTextActive]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'code' && styles.tabTextActive,
+            ]}
+          >
             代码
           </Text>
         </TouchableOpacity>
@@ -262,7 +311,12 @@ function MainScreen(): React.JSX.Element {
           style={[styles.tab, activeTab === 'data' && styles.tabActive]}
           onPress={() => setActiveTab('data')}
         >
-          <Text style={[styles.tabText, activeTab === 'data' && styles.tabTextActive]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'data' && styles.tabTextActive,
+            ]}
+          >
             数据
           </Text>
         </TouchableOpacity>
@@ -278,29 +332,50 @@ function MainScreen(): React.JSX.Element {
         <View style={styles.dataTabContainer}>
           <View style={styles.subTabBar}>
             <TouchableOpacity
-              style={[styles.subTab, dataSubTab === 'structure' && styles.subTabActive]}
+              style={[
+                styles.subTab,
+                dataSubTab === 'structure' && styles.subTabActive,
+              ]}
               onPress={() => setDataSubTab('structure')}
             >
-              <Text style={[styles.subTabText, dataSubTab === 'structure' && styles.subTabTextActive]}>
+              <Text
+                style={[
+                  styles.subTabText,
+                  dataSubTab === 'structure' && styles.subTabTextActive,
+                ]}
+              >
                 表结构
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.subTab, dataSubTab === 'preview' && styles.subTabActive]}
+              style={[
+                styles.subTab,
+                dataSubTab === 'preview' && styles.subTabActive,
+              ]}
               onPress={() => setDataSubTab('preview')}
             >
-              <Text style={[styles.subTabText, dataSubTab === 'preview' && styles.subTabTextActive]}>
+              <Text
+                style={[
+                  styles.subTabText,
+                  dataSubTab === 'preview' && styles.subTabTextActive,
+                ]}
+              >
                 数据预览
               </Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.dataContent}>
-            {dataSubTab === 'structure' ? renderTableStructure() : renderDataPreview()}
+            {dataSubTab === 'structure'
+              ? renderTableStructure()
+              : renderDataPreview()}
           </ScrollView>
         </View>
       )}
-      <AIAssistant sqlContent={fileData?.content || ''} serverUrl="http://192.168.1.134:3001" />
+      <AIAssistant
+        sqlContent={fileData?.content || ''}
+        serverUrl="http://192.168.1.134:3001"
+      />
     </View>
   );
 }
