@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQLViewer · 产品交互演示</title>
+<style>
+  :root{
+    --accent:#007AFF; --accent-light:#EAF3FF; --bg:#F5F5F5; --card:#FFFFFF;
+    --text:#333333; --muted:#666666; --border:#E0E0E0; --row:#F8F8F8; --err:#FF3B30;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Roboto','PingFang SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#dbe8ff 0%,#f4f6fb 45%,#e8efff 100%);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px;color:var(--text)}
+  h1{font-size:22px;font-weight:700;margin-bottom:4px;color:#1a2233}
+  .sub{font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center}
+  .stage{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start;max-width:1120px;width:100%}
+  /* 手机外框 */
+  .phone{width:375px;flex:0 0 375px;background:#0f1117;border-radius:46px;padding:12px;box-shadow:0 24px 60px rgba(10,20,45,.35);position:relative}
+  .phone .notch{position:absolute;top:20px;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#0f1117;border-radius:14px;z-index:6}
+  .screen{background:#fff;border-radius:36px;overflow:hidden;height:700px;position:relative;display:flex;flex-direction:column}
+  .statusbar{background:#fff;padding:8px 20px 4px;display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:#1a1a1a;flex:0 0 auto}
+  /* 底部 home indicator */
+  .homeindicator{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:120px;height:4px;border-radius:2px;background:#c8c8cc;z-index:9}
+  /* 页面区 */
+  .page:not(.active){display:none}
+  .page{flex:1;overflow:hidden;position:relative;background:#F5F5F5}
+  /* ---------- Home ---------- */
+  .home{height:100%}
+  .home .header{background:#fff;padding:16px 16px 14px;border-bottom:1px solid var(--border)}
+  .home .title{font-size:22px;font-weight:700;color:#333}
+  .home .searchwrap{background:#fff;padding:10px 16px;border-bottom:1px solid var(--border)}
+  .home .search{background:#F5F5F5;border-radius:8px;padding:9px 14px;font-size:14px;color:#999}
+  .home .content{padding:16px;height:calc(100% - 132px);overflow-y:auto}
+  .home .section{font-size:14px;font-weight:600;color:var(--muted);margin-bottom:12px}
+  .file{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer;transition:.15s;border:1px solid transparent}
+  .file:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(0,122,255,.15)}
+  .file .frow{display:flex;justify-content:space-between;align-items:center}
+  .file .fname{font-size:16px;font-weight:600;color:#333}
+  .file .ftag{font-size:11px;background:var(--accent-light);color:var(--accent);padding:3px 8px;border-radius:6px;font-weight:600}
+  .file .fmeta{font-size:12px;color:var(--muted);margin-top:8px;display:flex;justify-content:space-between;align-items:center}
+  .file .fmeta .ops{display:flex;gap:12px}
+  .file .fmeta .op{font-size:14px;color:#b0b0b0;cursor:pointer;padding:2px}
+  .file .fmeta .op:hover{color:var(--err)}
+  .clearhist{margin-top:8px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:13px;text-align:center;font-size:15px;font-weight:600;color:var(--err);cursor:pointer}
+  /* ---------- Main ---------- */
+  .main{display:flex;flex-direction:column;height:100%;background:#fff}
+  /* 顶部导航 header */
+  .navheader{display:flex;align-items:center;background:#fff;border-bottom:1px solid var(--border);padding:8px 8px;flex:0 0 auto;position:relative}
+  .navheader .back{background:none;border:none;font-size:26px;color:var(--accent);cursor:pointer;width:40px;height:36px;line-height:36px;text-align:left;font-weight:500}
+  .navheader .back:active{opacity:.5}
+  .navheader .ntitle{position:absolute;left:0;right:0;text-align:center;font-size:16px;font-weight:600;color:#1a1a1a;pointer-events:none;padding:0 70px}
+  .mbar{display:flex;flex:0 0 auto}
+  .mbar .mtab{flex:1;padding:13px 0;text-align:center;font-size:16px;color:var(--muted);background:#F5F5F5;cursor:pointer;border-bottom:2px solid transparent;transition:.15s}
+  .mbar .mtab.on{background:#fff;color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}
+  .mbody{flex:1;overflow:hidden;position:relative}
+  .tabpage{height:100%;overflow-y:auto;display:none}
+  .tabpage.on{display:block}
+  /* 代码页（浅色 + Format/Share 均分） */
+  .codebar{display:flex;gap:12px;padding:10px 12px;background:#F5F5F5;border-bottom:1px solid var(--border);justify-content:space-around}
+  .codebar .btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 0;font-size:13px;font-weight:600;cursor:pointer;width:46%}
+  .codeview{padding:12px 4px;background:#fff;font-family:'Consolas','Menlo',monospace;font-size:13px;line-height:20px;color:#1a1a1a;white-space:pre;overflow-x:auto}
+  .codeview .ln{display:inline-block;width:34px;text-align:right;color:#c0c0c0;user-select:none;margin-right:10px}
+  .codeview .kw{color:#007bff}.codeview .str{color:#690}.codeview .num{color:#905}.codeview .cm{color:#6a737d;font-style:italic}
+  /* 数据页 */
+  .subtab{display:flex;background:#FAFAFA;border-bottom:1px solid var(--border)}
+  .subtab button{flex:1;background:none;border:none;padding:12px 0;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+  .subtab button.on{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}
+  .datawrap{padding:16px;overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:13px;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+  th,td{border:1px solid var(--border);padding:11px 10px;text-align:center;white-space:nowrap}
+  th{background:#F0F0F0;font-weight:700;color:#333}
+  tr:nth-child(even) td{background:#F8F8F8}
+  tr:nth-child(odd) td{background:#fff}
+  .pk{color:var(--accent);font-weight:600}
+  .empty{padding:40px;text-align:center;font-size:14px;color:#999}
+  /* ---------- AI 助手 ---------- */
+  .ai-fab{position:absolute;right:18px;bottom:24px;width:60px;height:60px;border-radius:30px;background:var(--accent);color:#fff;font-size:26px;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:20;display:flex;align-items:center;justify-content:center;transition:all .28s cubic-bezier(.4,0,.2,1)}
+  .ai-fab.open{width:330px;height:500px;border-radius:16px;right:14px;bottom:16px;font-size:0;background:#fff;align-items:stretch;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.3);cursor:default;flex-direction:column}
+  .ai-inner{display:none;flex-direction:column;height:100%;width:100%}
+  .ai-fab.open .ai-inner{display:flex}
+  .ai-head{display:flex;align-items:center;margin-bottom:12px}
+  .ai-head .t{font-size:16px;font-weight:600;color:#333}
+  .ai-head .sp{flex:1}
+  .ai-head .hb{background:none;border:none;font-size:18px;cursor:pointer;padding:4px;color:var(--muted)}
+  .ai-head .hb.close{font-size:22px;font-weight:600;color:var(--accent)}
+  .ai-presets{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .ai-presets button{background:var(--accent);color:#fff;border:none;border-radius:16px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer}
+  .ai-presets button:hover{opacity:.88}
+  .ai-msgs{flex:1;overflow-y:auto;padding:2px 0}
+  .msg{max-width:85%;padding:10px 12px;border-radius:8px;font-size:13px;line-height:20px;margin-bottom:8px;white-space:pre-wrap}
+  .msg.user{margin-left:auto;background:var(--accent);color:#fff}
+  .msg.ai{background:#f0f0f0;color:#333}
+  .msg .tk{font-size:10px;margin-top:4px;opacity:.75}
+  .ai-model{font-size:11px;color:var(--muted);margin-bottom:8px}
+  .ai-input{display:flex;align-items:flex-end;gap:8px;margin-top:4px}
+  .ai-input input{flex:1;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;outline:none;color:#333}
+  .ai-input .send{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+  .ai-input .refresh{background:var(--err);color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:16px;font-weight:600;cursor:pointer}
+  /* ---------- 设置弹窗 ---------- */
+  .modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:40;display:none;align-items:center;justify-content:center}
+  .modal-overlay.show{display:flex}
+  .modal-panel{background:#fff;border-radius:16px;width:92%;max-height:86%;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+  .ms-head{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border)}
+  .ms-head .t{font-size:18px;font-weight:600;color:#1a1a1a}
+  .ms-head .x{background:none;border:none;font-size:18px;font-weight:600;color:var(--accent);cursor:pointer;padding:4px}
+  .ms-body{padding:14px 16px;overflow-y:auto}
+  .ms-sec{font-size:14px;font-weight:600;color:#1a1a1a;margin:12px 0 10px}
+  .ms-sec:first-child{margin-top:0}
+  .ms-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px}
+  .ms-card .label{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .ms-input{width:100%;border:1px solid var(--border);border-radius:8px;background:#F5F5F5;padding:9px 12px;font-size:13px;outline:none;color:#333}
+  .ms-input:focus{border-color:var(--accent)}
+  .ms-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+  .ms-btn{border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:500;color:#fff;cursor:pointer}
+  .ms-btn.primary{background:var(--accent)}
+  .ms-btn.gray{background:#8E8E93}
+  .ms-btn.red{background:var(--err)}
+  .model-item{display:flex;flex-direction:column;padding:10px;border-radius:6px;margin-bottom:6px;cursor:pointer}
+  .model-item.sel{background:var(--accent-light)}
+  .model-item .mrow{display:flex;align-items:center;gap:6px}
+  .model-item .mname{font-size:13px;font-weight:500;flex:1;color:#333}
+  .model-item.sel .mname{color:var(--accent)}
+  .model-item .mrest{font-size:10px;background:#FF6B6B;color:#fff;padding:2px 6px;border-radius:4px}
+  .model-item .mprov{font-size:11px;color:var(--muted);margin-top:2px}
+  .preset-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+  .preset-item .pinfo{flex:1;margin-right:8px;min-width:0}
+  .preset-item .plabel{font-size:14px;font-weight:500;color:#333}
+  .preset-item .pprompt{font-size:12px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .preset-item .pacts{display:flex;gap:12px}
+  .preset-item .pacts button{background:none;border:none;font-size:12px;font-weight:500;cursor:pointer;padding:4px}
+  .preset-item .pacts .edit{color:var(--accent)}
+  .preset-item .pacts .del{color:var(--err)}
+  .about-box{border:1px solid var(--border);border-radius:8px;padding:12px}
+  .about-box .a1{font-size:14px;font-weight:500;color:#333}
+  .about-box .a2{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
+  .divider{height:1px;background:var(--border);margin:14px 0}
+  /* 右侧说明面板 */
+  .side{flex:1 1 390px;min-width:320px;max-width:580px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .side h2{font-size:18px;font-weight:700;margin-bottom:6px}
+  .side .desc{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:18px}
+  .stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:18px}
+  .stat .box{background:linear-gradient(135deg,rgba(0,122,255,.08),rgba(0,122,255,.14));border-radius:12px;padding:12px;text-align:center}
+  .stat .n{font-size:20px;font-weight:700;color:var(--accent)}
+  .stat .l{font-size:11px;color:var(--muted);margin-top:2px}
+  .step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+  .step .no{flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+  .step .txt{font-size:13px;line-height:1.6}
+  .step .txt b{display:block;margin-bottom:2px}
+  .hint{font-size:11px;color:var(--muted);background:#f8fafc;border:1px dashed var(--border);border-radius:10px;padding:10px 12px;margin-top:16px;line-height:1.6}
+  .foot{text-align:center;font-size:11px;color:var(--muted);margin-top:18px}
+  @media(max-width:760px){ .phone{flex:0 0 340px;width:340px} .ai-fab.open{width:300px;height:460px} }
+</style>
+</head>
+<body>
+  <h1>SQLViewer · 产品交互演示</h1>
+  <div class="sub">移动端 MySQL 脚本查看工具 · 集成 AI 语法检测与脚本解读 · 点击左侧手机界面即可体验</div>
+
+  <div class="stage">
+    <!-- 手机 -->
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+
+        <!-- Home 页 -->
+        <div class="page home active" id="pageHome">
+          <div class="header"><div class="title">📄 SQLViewer</div></div>
+          <div class="searchwrap"><div class="search">🔍 搜索文件...</div></div>
+          <div class="content">
+            <div class="section" id="sectionTitle">最近文件 (3)</div>
+            <div id="fileList"></div>
+            <div class="clearhist" onclick="alert('演示：已清空历史（仅示意）')">清空历史</div>
+          </div>
+        </div>
+
+        <!-- Main 页 -->
+        <div class="page main" id="pageMain">
+          <!-- 顶部导航：返回 + 标题 -->
+          <div class="navheader">
+            <button class="back" onclick="goHome()">‹</button>
+            <span class="ntitle" id="navTitle">orders.sql</span>
+          </div>
+          <div class="mbar">
+            <div class="mtab on" id="mtabCode" onclick="switchTab('code')">代码</div>
+            <div class="mtab" id="mtabData" onclick="switchTab('data')">数据</div>
+          </div>
+          <div class="mbody">
+            <div class="tabpage on" id="pageCode">
+              <div class="codebar">
+                <button class="btn" onclick="toggleFormat()"><span id="fmtBtn">Format</span></button>
+                <button class="btn" onclick="alert('演示：分享 SQL 内容（仅示意）')">Share</button>
+              </div>
+              <div class="codeview" id="codeView"></div>
+            </div>
+            <div class="tabpage" id="pageData">
+              <div class="subtab">
+                <button class="on" id="stStruct" onclick="switchData('struct')">表结构</button>
+                <button id="stPreview" onclick="switchData('preview')">数据预览</button>
+              </div>
+              <div class="datawrap" id="dataBody"></div>
+            </div>
+          </div>
+
+          <!-- AI 助手 -->
+          <div class="ai-fab" id="aiFab" onclick="toggleAI()">
+            🤖
+            <div class="ai-inner" onclick="event.stopPropagation()">
+              <div class="ai-head">
+                <span class="t">SQL AI 助手</span>
+                <span class="sp"></span>
+                <button class="hb" onclick="openSettings()">⚙️</button>
+                <button class="hb close" onclick="toggleAI(false)">−</button>
+              </div>
+              <div class="ai-presets" id="aiPresets"></div>
+              <div class="ai-msgs" id="aiMsgs"></div>
+              <div class="ai-model" id="aiModel">当前模型: MiniMax-M2.5</div>
+              <div class="ai-input">
+                <input id="aiInput" placeholder="输入问题..." onkeydown="if(event.key==='Enter')sendQuestion()">
+                <button class="send" onclick="sendQuestion()">发送</button>
+                <button class="refresh" onclick="resetChat()">↻</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI 设置弹窗 -->
+        <div class="modal-overlay" id="settingsModal" onclick="closeSettings()">
+          <div class="modal-panel" onclick="event.stopPropagation()">
+            <div class="ms-head">
+              <span class="t">设置</span>
+              <button class="x" onclick="closeSettings()">✕</button>
+            </div>
+            <div class="ms-body">
+              <!-- 服务器地址 -->
+              <div class="ms-sec">服务器地址</div>
+              <div class="ms-card">
+                <div class="label">AI 后端服务地址</div>
+                <input class="ms-input" id="serverUrl" value="http://localhost:3001" onfocus="this.select()">
+                <div class="ms-btns">
+                  <button class="ms-btn gray" onclick="alert('已重置为默认地址 http://localhost:3001')">重置</button>
+                  <button class="ms-btn primary" onclick="alert('服务器地址已保存')">保存</button>
+                </div>
+              </div>
+
+              <!-- 模型选择 -->
+              <div class="ms-sec">AI 模型选择</div>
+              <div class="ms-card">
+                <input class="ms-input" id="modelSearch" placeholder="搜索模型..." oninput="filterModels(this.value)" style="margin-bottom:10px">
+                <div id="modelList"></div>
+                <div class="ms-btns">
+                  <button class="ms-btn primary" onclick="alert('已从服务器加载模型列表（共 64 个模型）')">加载模型</button>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <!-- 预设提示词管理 -->
+              <div class="ms-sec">预设提示词管理</div>
+              <div id="presetManageList"></div>
+              <div class="ms-card">
+                <div class="label" id="presetFormTitle">添加新预设</div>
+                <input class="ms-input" placeholder="标签名称" style="margin-bottom:8px">
+                <input class="ms-input" placeholder="提示词内容">
+                <div class="ms-btns">
+                  <button class="ms-btn primary" onclick="alert('预设已添加（演示）')">添加</button>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <!-- 聊天管理 -->
+              <div class="ms-sec">聊天管理</div>
+              <button class="ms-btn red" style="width:100%;margin-bottom:12px" onclick="resetChat();alert('聊天记录已清空')">清空聊天记录</button>
+
+              <!-- 关于 -->
+              <div class="ms-sec">关于</div>
+              <div class="about-box">
+                <div class="a1">SQL AI 助手</div>
+                <div class="a2">版本 1.0.0<br>智能SQL分析工具，帮助您分析、优化和安全检查SQL语句。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="homeindicator"></div>
+      </div>
+    </div>
+
+    <!-- 说明面板 -->
+    <div class="side">
+      <h2>为什么做 SQLViewer？</h2>
+      <div class="desc">业务人员经常从微信/邮件收到数据库导出的 SQL 脚本，却看不懂建表语句与数据。SQLViewer 把脚本变成「看得懂的表格」，并让 AI 帮你解读——降低看懂数据脚本的门槛。</div>
+      <div class="stat">
+        <div class="box"><div class="n">10+</div><div class="l">覆盖部门成员</div></div>
+        <div class="box"><div class="n">10→2</div><div class="l">问题排查耗时(分钟)</div></div>
+        <div class="box"><div class="n">77</div><div class="l">单元测试用例</div></div>
+      </div>
+      <h2 style="font-size:15px;margin-bottom:12px">🧭 演示路径</h2>
+      <div class="step"><div class="no">1</div><div class="txt"><b>打开脚本</b>点击历史文件（如 orders.sql），顶部出现返回导航，可随时返回首页</div></div>
+      <div class="step"><div class="no">2</div><div class="txt"><b>代码视图</b>浅色代码区 + 语法高亮，Format / Share 均分排列，可点 Format 体验格式化</div></div>
+      <div class="step"><div class="no">3</div><div class="txt"><b>数据视图</b>切换「数据」Tab → 表结构 / 数据预览，脚本自动转表格</div></div>
+      <div class="step"><div class="no">4</div><div class="txt"><b>AI 解读</b>点右下角 🤖，面板展开；点 ⚙️ 可打开设置弹窗查看模型选择等配置</div></div>
+      <div class="hint">💡 面试/汇报时：浏览器全屏打开本页即可演示完整产品交互，无需安装 APK。真实部署时后端接入 SiliconFlow LLM，AI 回答为真实生成。</div>
+    </div>
+  </div>
+  <div class="foot">SQLViewer · React Native 产品交互演示 · 数据为示例</div>
+
+<script>
+(function(){
+  var SQL = "CREATE TABLE orders (\n" +
+  "  id INT PRIMARY KEY AUTO_INCREMENT,\n" +
+  "  order_no VARCHAR(32) NOT NULL,\n" +
+  "  user_id INT NOT NULL,\n" +
+  "  amount DECIMAL(10,2) DEFAULT 0.00,\n" +
+  "  status TINYINT DEFAULT 0 COMMENT '0-待支付 1-已支付',\n" +
+  "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n" +
+  ");\n\n" +
+  "INSERT INTO orders (order_no, user_id, amount, status) VALUES\n" +
+  "('SO20240301', 1001, 299.00, 1),\n" +
+  "('SO20240302', 1002, 599.00, 0),\n" +
+  "('SO20240303', 1003, 129.50, 1);";
+
+  var files = [
+    {name:'orders.sql', size:'1.2 KB', time:'2分钟前', tag:'SQL', sql:SQL},
+    {name:'users_table.sql', size:'820 B', time:'1小时前', tag:'SQL', sql:"CREATE TABLE users (\n  id INT PRIMARY KEY AUTO_INCREMENT,\n  username VARCHAR(50) NOT NULL,\n  email VARCHAR(100) UNIQUE,\n  age TINYINT,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);\n\nINSERT INTO users (username, email, age) VALUES\n('alice', 'alice@test.com', 28),\n('bob', 'bob@test.com', 32);"},
+    {name:'order_detail_2024.sql', size:'3.5 KB', time:'昨天', tag:'SQL', sql:"CREATE TABLE order_detail (\n  id INT PRIMARY KEY AUTO_INCREMENT,\n  order_id INT NOT NULL,\n  product_id INT NOT NULL,\n  price DECIMAL(10,2),\n  qty INT DEFAULT 1,\n  subtotal DECIMAL(10,2)\n);\n\nINSERT INTO order_detail (order_id, product_id, price, qty) VALUES\n(1, 501, 299.00, 1),\n(2, 502, 199.00, 2);"}
+  ];
+
+  var presets = [
+    {label:'分析SQL健壮性', reply:"健壮性分析（orders 表）：\n\n✅ 合理之处：\n• order_no 用 VARCHAR(32) 适合订单号；amount 用 DECIMAL(10,2) 精确存储金额\n• created_at 设置默认值，避免漏填\n\n⚠️ 可改进：\n1. order_no 建议加 UNIQUE 唯一索引，防止重复订单号\n2. status TINYINT 建议加 CHECK(status IN (0,1)) 约束，避免非法状态值\n3. user_id 建议建立外键/索引，关联 users 表\n4. 大数据量下 amount 的 DEFAULT 0.00 可能掩盖脏数据", tokens:486},
+    {label:'查找潜在bug', reply:"潜在问题排查：\n\n1. status 字段用 TINYINT 存状态，若代码里用 '1'/'0' 字符串比较会导致类型不一致\n2. INSERT 未显式列出 id，应用层若误以为 id 从 1 开始，可能造成主键认知偏差（实际 AUTO_INCREMENT 自增）\n3. order_no 未加唯一约束：同一天并发下单可能生成重复单号\n4. 若删除用户记录，orders 表会残留孤儿数据（缺外键约束）", tokens:412},
+    {label:'性能优化建议', reply:"性能优化建议：\n\n1. order_no 建立唯一索引 UNIQUE KEY，加速按订单号查询（业务高频路径）\n2. user_id 建立普通索引，优化按用户查订单\n3. created_at 建立索引，支撑时间范围统计查询\n4. 若表持续增长，建议按月分区 PARTITION BY RANGE(created_at)\n5. 查询时避免 SELECT *，只取需要的列", tokens:368},
+    {label:'安全漏洞检查', reply:"安全风险检查：\n\n1. ✅ 示例脚本本身无明显 SQL 注入点（纯 DDL/DML）\n\n需注意的风险：\n1. 若脚本由代码拼接生成，order_no/amount 等值传入需使用参数化查询，防止注入\n2. 数据导出文件含真实用户数据，注意脱敏（user_id 建议替换为脱敏值）\n3. 分享 .sql 文件到微信属于数据外发，需遵循公司数据安全规范\n4. DECIMAL 金额字段在应用层展示时要处理精度，避免浮点误差", tokens:455}
+  ];
+
+  // 模拟服务器返回的模型列表（真实来自 /api/models）
+  var models = [
+    {id:'Pro/MiniMaxAI/MiniMax-M2.5', name:'MiniMax-M2.5', provider:'MiniMaxAI', restricted:false},
+    {id:'MiniMaxAI/MiniMax-M3', name:'MiniMax-M3', provider:'MiniMaxAI', restricted:true, reason:'需要额外权限'},
+    {id:'DeepSeek-AI/DeepSeek-V3', name:'DeepSeek-V3', provider:'DeepSeek-AI', restricted:false},
+    {id:'Qwen/Qwen2.5-72B-Instruct', name:'Qwen2.5-72B-Instruct', provider:'Qwen', restricted:false},
+    {id:'01-ai/Yi-1.5-34B-Chat', name:'Yi-1.5-34B-Chat', provider:'01-ai', restricted:true, reason:'可能受限'},
+    {id:'internlm/internlm2_5-7b-chat', name:'internlm2_5-7b-chat', provider:'internlm', restricted:true, reason:'可能受限'}
+  ];
+  var selectedModel = models[0].id;
+
+  var currentFile = files[0];
+  var currentData = 'struct';
+  var formatted = false;
+
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  function highlight(sql){
+    var out = esc(sql);
+    out = out.replace(/(--[^\n]*)/g,'<span class="cm">$1</span>');
+    out = out.replace(/('(?:[^'\\]|\\.)*')/g,'<span class="str">$1</span>');
+    out = out.replace(/\b(CREATE|TABLE|INT|VARCHAR|DECIMAL|TINYINT|DATETIME|PRIMARY|KEY|AUTO_INCREMENT|NOT|NULL|DEFAULT|COMMENT|INSERT|INTO|VALUES|SELECT|FROM|WHERE|UPDATE|SET|AND|OR|ON|IF|EXISTS|CHECK|UNIQUE|CURRENT_TIMESTAMP)\b/g,'<span class="kw">$1</span>');
+    out = out.replace(/\b(\d+\.?\d*)\b/g,'<span class="num">$1</span>');
+    var lines = out.split('\n');
+    return lines.map(function(l, i){ return '<span class="ln">'+(i+1)+'</span>'+l; }).join('\n');
+  }
+  function formatSQL(){ return "CREATE TABLE orders (\n    id INT PRIMARY KEY AUTO_INCREMENT,\n    order_no VARCHAR(32) NOT NULL,\n    user_id INT NOT NULL,\n    amount DECIMAL(10, 2) DEFAULT 0.00,\n    status TINYINT DEFAULT 0 COMMENT '0-待支付 1-已支付',\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);\nINSERT INTO orders (order_no, user_id, amount, status)\nVALUES\n    ('SO20240301', 1001, 299.00, 1),\n    ('SO20240302', 1002, 599.00, 0),\n    ('SO20240303', 1003, 129.50, 1);"; }
+  function parseColumns(sql){
+    var m = sql.match(/CREATE TABLE [^(]*\(([\s\S]*?)\)/);
+    if(!m) return [];
+    var cols = [], defs = m[1].split(/\n/);
+    defs.forEach(function(l){
+      l = l.trim().replace(/,$/,'');
+      if(!l || /^(PRIMARY|UNIQUE|KEY|CONSTRAINT|FOREIGN)/i.test(l)) return;
+      var p = l.split(/\s+/);
+      if(p.length < 2) return;
+      var name = p[0].replace(/`/g,'');
+      var type = p[1].toUpperCase();
+      var cons = [];
+      if(/PRIMARY KEY/i.test(l)) cons.push('<span class="pk">PK</span>');
+      if(/NOT NULL/i.test(l)) cons.push('NOT NULL');
+      if(/AUTO_INCREMENT/i.test(l)) cons.push('自增');
+      var d = l.match(/DEFAULT\s+([^\s,]+)/); if(d) cons.push('默认 '+d[1]);
+      cols.push({name:name, type:type, cons:cons.join(' ')});
+    });
+    return cols;
+  }
+  function parseInserts(sql){
+    var m = sql.match(/INSERT\s+INTO\s+\w+\s*\([^)]*\)\s*VALUES\s*([\s\S]*?);/i);
+    if(!m) return [];
+    var rows = [], re = /\(([^()]*)\)/g, r;
+    while((r = re.exec(m[1])) !== null) rows.push(r[1].split(',').map(function(v){return v.trim().replace(/^'|'$/g,'')}));
+    return rows;
+  }
+
+  function renderFiles(){
+    document.getElementById('fileList').innerHTML = files.map(function(f, i){
+      return '<div class="file" onclick="openFile('+i+')">'+
+        '<div class="frow"><span class="fname">'+f.name+'</span><span class="ftag">'+f.tag+'</span></div>'+
+        '<div class="fmeta"><span>'+f.size+' · '+f.time+'</span>'+
+        '<span class="ops"><span class="op" onclick="event.stopPropagation();alert(\'演示：复制到应用存储（仅示意）\')">⧉</span>'+
+        '<span class="op" onclick="event.stopPropagation();alert(\'演示：删除文件（仅示意）\')">🗑</span></span></div></div>';
+    }).join('');
+  }
+  window.openFile = function(i){
+    currentFile = files[i]; formatted = false;
+    document.getElementById('pageHome').classList.remove('active');
+    document.getElementById('pageMain').classList.add('active');
+    document.getElementById('navTitle').textContent = currentFile.name;
+    renderCode(); renderData(); switchTab('code');
+  };
+  window.goHome = function(){
+    document.getElementById('pageMain').classList.remove('active');
+    document.getElementById('pageHome').classList.add('active');
+    closeSettings();
+    toggleAI(false);
+  };
+  function renderCode(){
+    document.getElementById('codeView').innerHTML = highlight(formatted ? formatSQL() : currentFile.sql);
+    document.getElementById('fmtBtn').textContent = formatted ? 'Original' : 'Format';
+  }
+  window.toggleFormat = function(){ formatted = !formatted; renderCode(); };
+  function renderData(){
+    var cols = parseColumns(currentFile.sql);
+    var rows = parseInserts(currentFile.sql);
+    var body = document.getElementById('dataBody');
+    if(currentData === 'struct'){
+      if(!cols.length){ body.innerHTML = '<div class="empty">没有创建表语句</div>'; return; }
+      body.innerHTML = '<table><tr><th>字段名</th><th>类型</th><th>约束</th></tr>'+
+        cols.map(function(c){return '<tr><td>'+c.name+'</td><td>'+c.type+'</td><td>'+c.cons+'</td></tr>'}).join('')+'</table>';
+    } else {
+      if(rows.length===0){ body.innerHTML = '<div class="empty">暂无数据 (无 INSERT 语句)</div>'; return; }
+      var names = cols.map(function(c){return c.name});
+      body.innerHTML = '<table><tr>'+names.map(function(n){return '<th>'+n+'</th>'}).join('')+'</tr>'+
+        rows.map(function(r){return '<tr>'+r.map(function(v){return '<td>'+esc(v)+'</td>'}).join('')+'</tr>'}).join('')+'</table>';
+    }
+  }
+  window.switchTab = function(t){
+    document.getElementById('mtabCode').className = 'mtab'+(t==='code'?' on':'');
+    document.getElementById('mtabData').className = 'mtab'+(t==='data'?' on':'');
+    document.getElementById('pageCode').className = 'tabpage'+(t==='code'?' on':'');
+    document.getElementById('pageData').className = 'tabpage'+(t==='data'?' on':'');
+    if(t==='data') renderData();
+  };
+  window.switchData = function(d){
+    currentData = d;
+    document.getElementById('stStruct').className = d==='struct'?'on':'';
+    document.getElementById('stPreview').className = d==='preview'?'on':'';
+    renderData();
+  };
+  // AI
+  function renderPresets(){
+    document.getElementById('aiPresets').innerHTML = presets.map(function(p){
+      return '<button onclick="askPreset('+presets.indexOf(p)+')">'+p.label+'</button>';
+    }).join('');
+  }
+  function renderPresetManage(){
+    document.getElementById('presetManageList').innerHTML = presets.map(function(p, i){
+      return '<div class="preset-item"><div class="pinfo"><div class="plabel">'+p.label+'</div>'+
+        '<div class="pprompt">'+esc(p.reply.split('\n')[0])+'</div></div>'+
+        '<div class="pacts"><button class="edit" onclick="alert(\'演示：编辑预设\')">编辑</button>'+
+        '<button class="del" onclick="alert(\'演示：删除预设\')">删除</button></div></div>';
+    }).join('');
+  }
+  function renderModels(filter){
+    var list = document.getElementById('modelList');
+    var f = (filter||'').toLowerCase();
+    var data = models.filter(function(m){ return m.name.toLowerCase().indexOf(f)>=0 || m.provider.toLowerCase().indexOf(f)>=0; });
+    if(!data.length){ list.innerHTML = '<div style="font-size:12px;color:#999;text-align:center;padding:12px">没有匹配的模型</div>'; return; }
+    list.innerHTML = data.map(function(m){
+      var sel = selectedModel === m.id;
+      return '<div class="model-item'+(sel?' sel':'')+'" onclick="selectModel(\''+m.id+'\')">'+
+        '<div class="mrow"><span class="mname">'+m.name+'</span>'+(m.restricted?'<span class="mrest">受限制</span>':'')+'</div>'+
+        '<div class="mprov">'+m.provider+(m.restricted?' · '+m.reason:'')+'</div></div>';
+    }).join('');
+  }
+  window.selectModel = function(id){
+    selectedModel = id;
+    var m = models.filter(function(x){return x.id===id})[0];
+    renderModels(document.getElementById('modelSearch').value);
+    document.getElementById('aiModel').textContent = '当前模型: ' + (m?m.name:id.split('/').pop());
+    alert('已切换到 ' + (m?m.name:id) + ' 模型');
+  };
+  window.filterModels = function(v){ renderModels(v); };
+  window.toggleAI = function(force){
+    var fab = document.getElementById('aiFab');
+    var open = (typeof force==='boolean') ? force : !fab.classList.contains('open');
+    fab.classList.toggle('open', open);
+    if(open){ fab.style.fontSize='0'; } else { fab.style.fontSize='26px'; }
+    var box = document.getElementById('aiMsgs'); if(open) box.scrollTop = 99999;
+  };
+  window.openSettings = function(){
+    document.getElementById('settingsModal').classList.add('show');
+    renderModels('');
+  };
+  window.closeSettings = function(){ document.getElementById('settingsModal').classList.remove('show'); };
+  function addMsg(role, text, tokens){
+    var box = document.getElementById('aiMsgs');
+    var div = document.createElement('div');
+    div.className = 'msg ' + role;
+    if(tokens) div.innerHTML = '<span style="white-space:pre-wrap">'+esc(text)+'</span><div class="tk">Tokens: '+tokens+'</div>';
+    else div.textContent = text;
+    box.appendChild(div); box.scrollTop = 99999;
+    return div;
+  }
+  function typeMsg(div, text){
+    var i = 0; div.textContent = '';
+    (function step(){ if(i < text.length){ div.textContent = text.slice(0, i+1); i += 2; setTimeout(step, 10); } else div.textContent = text; })();
+  }
+  window.askPreset = function(i){
+    var p = presets[i];
+    addMsg('user', p.label);
+    var div = addMsg('ai', '');
+    typeMsg(div, p.reply);
+    var tk = document.createElement('div'); tk.className='tk'; tk.textContent='Tokens: '+p.tokens; div.appendChild(tk);
+  };
+  window.sendQuestion = function(){
+    var input = document.getElementById('aiInput');
+    var q = input.value.trim(); if(!q) return;
+    input.value = '';
+    addMsg('user', q);
+    var div = addMsg('ai','');
+    typeMsg(div, '基于当前 SQL 脚本：建议重点检查索引设计与字段约束（详见“性能优化建议”与“健壮性分析”快捷问题）。真实部署时，此处将调用 LLM 生成针对性回答。');
+    var tk = document.createElement('div'); tk.className='tk'; tk.textContent='Tokens: 320'; div.appendChild(tk);
+  };
+  window.resetChat = function(){
+    var box = document.getElementById('aiMsgs');
+    box.innerHTML = '<div class="msg ai">你好，我是 SQL 分析助手。可以帮你分析当前脚本的健壮性、潜在 Bug、性能优化与安全风险。试试下面的快捷问题 👇</div>';
+  };
+  renderFiles(); renderPresets(); renderPresetManage(); renderModels(''); resetChat();
+})();
+</script>
+</body>
+</html>
